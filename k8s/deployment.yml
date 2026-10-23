@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubepractice-deployment
+  namespace: kubepractice
+  labels:
+    app: kubepractice
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubepractice
+  template:
+    metadata:
+      labels:
+        app: kubepractice
+    spec:
+      containers:
+      - name: kubepractice
+        image: ghcr.io/squareupstudio/kubepractice:2.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
