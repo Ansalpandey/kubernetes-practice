@@ -9,7 +9,7 @@ pipeline {
         }
         stage('Tag & Push Image to GHCR') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'your-credential-id', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'e6c0b173-c312-4fea-856d-29bbdca656c6', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_PASS')]) {
                     sh '''
                         echo "$GHCR_PASS" | podman login ghcr.io -u "$GHCR_USER" --password-stdin
                     '''
