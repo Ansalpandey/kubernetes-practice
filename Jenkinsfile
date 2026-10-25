@@ -2,9 +2,18 @@ pipeline {
     agent any
 
     stages {
+        stage('Determine Version') {
+            steps {
+                script {
+                    env.APP_VERSION = sh(script: "node -p \"require('./package.json').version\"", returnStdout: true).trim()
+                    env.IMAGE_TAG = "${env.APP_VERSION}-${env.BUILD_NUMBER}"
+                    echo "Building and pushing version: ${env.IMAGE_TAG}"
+                }
+            }
+        }
         stage('Build Docker Image') {
             steps {
-                sh "podman build --network=host --no-cache -t localhost/ansalpandey/kubepractice:1.0.${env.BUILD_NUMBER} ."
+                sh "podman build --network=host --no-cache -t localhost/ansalpandey/kubepractice:${env.IMAGE_TAG} ."
             }
         }
         stage('Tag & Push Image to GHCR') {
@@ -14,8 +23,8 @@ pipeline {
                         echo "$GHCR_PASS" | podman login ghcr.io -u "$GHCR_USER" --password-stdin
                     '''
                 }
-                sh "podman tag localhost/ansalpandey/kubepractice:1.0.${env.BUILD_NUMBER} ghcr.io/squareupstudio/kubepractice:1.0.${env.BUILD_NUMBER}"
-                sh "podman push ghcr.io/squareupstudio/kubepractice:1.0.${env.BUILD_NUMBER}"
+                sh "podman tag localhost/ansalpandey/kubepractice:${env.IMAGE_TAG} ghcr.io/squareupstudio/kubepractice:${env.IMAGE_TAG}"
+                sh "podman push ghcr.io/squareupstudio/kubepractice:${env.IMAGE_TAG}"
             }
         }
     }
