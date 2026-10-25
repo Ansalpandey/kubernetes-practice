@@ -1,11 +1,10 @@
 pipeline {
     agent any
-
     stages {
         stage('Determine Version') {
             steps {
                 script {
-                    env.APP_VERSION = sh(script: "node -p \"require('./package.json').version\"", returnStdout: true).trim()
+                    env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f 4 | head -n 1", returnStdout: true).trim()
                     env.IMAGE_TAG = "${env.APP_VERSION}-${env.BUILD_NUMBER}"
                     echo "Building and pushing version: ${env.IMAGE_TAG}"
                 }
