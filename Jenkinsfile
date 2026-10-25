@@ -5,7 +5,7 @@ pipeline {
             steps {
                 script {
                     env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f 4 | head -n 1", returnStdout: true).trim()
-                    env.IMAGE_TAG = "${env.APP_VERSION}-${env.BUILD_NUMBER}"
+                    env.IMAGE_TAG = "${env.APP_VERSION}"
                     echo "Building and pushing version: ${env.IMAGE_TAG}"
                 }
             }
