@@ -1,8 +1,6 @@
 pipeline {
     agent any
-
     options {
-        // Prevent concurrent builds from racing on Git commits
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
@@ -10,7 +8,7 @@ pipeline {
     environment {
         REGISTRY = 'ghcr.io'
         IMAGE_NAME = 'squareupstudio/kubepractice'
-        MANIFEST_PATH = 'deployment.yaml' // Change to 'manifests/deployment.yaml' if in a subfolder
+        MANIFEST_PATH = 'deployment.yml'
         GIT_REPO_URL = 'github.com/Ansalpandey/kubernetes-practice.git'
     }
 
@@ -33,7 +31,6 @@ pipeline {
                 script {
                     env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f 4 | head -n 1", returnStdout: true).trim()
                     env.SHORT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                    // Combining semver + commit SHA guarantees a unique tag on every push
                     env.IMAGE_TAG = "${env.APP_VERSION}-${env.SHORT_SHA}"
                     echo "Building immutable image tag: ${env.IMAGE_TAG}"
                 }
@@ -65,7 +62,7 @@ pipeline {
         stage('Update GitOps Manifest') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'e6c0b173-c312-4fea-856d-29bbdca656c6', // Ensure token has 'repo' write scope
+                    credentialsId: 'e6c0b173-c312-4fea-856d-29bbdca656c6',
                     usernameVariable: 'GIT_USER',
                     passwordVariable: 'GIT_PASS'
                 )]) {
@@ -73,10 +70,7 @@ pipeline {
                         git config user.name "Jenkins CI Bot"
                         git config user.email "ci-bot@squareupstudio.local"
 
-                        # Update the image tag in deployment.yaml
                         sed -i "s|image: ${REGISTRY}/${IMAGE_NAME}:.*|image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}|g" ${MANIFEST_PATH}
-
-                        # Only commit and push if deployment.yaml actually changed
                         if ! git diff --quiet ${MANIFEST_PATH}; then
                             git add ${MANIFEST_PATH}
                             git commit -m "chore(gitops): bump image to ${IMAGE_TAG} [skip ci]"
@@ -92,7 +86,6 @@ pipeline {
 
     post {
         always {
-            // Clean up registry auth & local dangling images to save NVMe space
             sh '''
                 podman logout ${REGISTRY} || true
                 podman image prune -f || true
