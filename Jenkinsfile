@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         LOCAL_IMAGE      = 'localhost/ansalpandey/kubepractice'
-        REMOTE_IMAGE     = 'ghcr.io/squareupstudio/kubepractice'
+        REMOTE_IMAGE     = 'ghcr.io/ansalpandey/kubepractice'
         GITOPS_REPO      = 'https://github.com/Ansalpandey/kubernetes-practice.git'
         GITOPS_BRANCH    = 'main'
         GITOPS_MANIFEST  = 'k8s/deployment.yml'
