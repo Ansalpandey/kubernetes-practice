@@ -24,7 +24,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.TARGET_URL || "http://10.102.150.85:3200";
+const BASE_URL = __ENV.TARGET_URL || "http://192.168.39.162:31728";
 
 export default function () {
   const params = {

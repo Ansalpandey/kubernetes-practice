@@ -1,0 +1,108 @@
+name: Build, Push & Update GitOps
+
+on:
+  push:
+    branches:
+      - main
+    # Equivalent to your nonK8sChanges guard: skips workflow if ONLY k8s/ files changed
+    paths-ignore:
+      - 'k8s/**'
+
+# Equivalent to Jenkins options { disableConcurrentBuilds() }
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  LOCAL_IMAGE: localhost/ansalpandey/kubepractice
+  REMOTE_IMAGE: ghcr.io/ansalpandey/kubepractice
+  GITOPS_REPO: https://github.com/Ansalpandey/kubernetes-practice.git
+  GITOPS_BRANCH: main
+  GITOPS_MANIFEST: k8s/deployment.yml
+  GITOPS_CONTAINER: kubepractice
+
+jobs:
+  build-and-update-gitops:
+    runs-on: ubuntu-latest
+    # Equivalent to your commitMessage.contains('[skip ci]') guard
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    permissions:
+      contents: write   # Needed to push the GitOps commit back to the repo
+      packages: write   # Needed to push container images to ghcr.io
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          APP_VERSION=$(grep '"version"' package.json | cut -d '"' -f 4 | head -n 1)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+
+          if [ -z "$APP_VERSION" ] || [ -z "$SHORT_SHA" ]; then
+            echo "::error::Unable to determine application version or commit SHA."
+            exit 1
+          fi
+
+          IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "Building and pushing version: ${IMAGE_TAG}"
+
+      - name: Build Container Image
+        run: |
+          podman build \
+            --network=host \
+            -t "${LOCAL_IMAGE}:${IMAGE_TAG}" .
+
+      - name: Tag & Push Image to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+          podman tag "${LOCAL_IMAGE}:${IMAGE_TAG}" "${REMOTE_IMAGE}:${IMAGE_TAG}"
+          podman push "${REMOTE_IMAGE}:${IMAGE_TAG}"
+
+      - name: Update GitOps Repository
+        run: |
+          set -eu
+
+          mkdir -p gitops
+          cd gitops
+
+          git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/Ansalpandey/kubernetes-practice.git" .
+          git checkout "${GITOPS_BRANCH}"
+
+          git config user.name "GitHub Actions CI"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          sed -i \
+            "/name: ${GITOPS_CONTAINER}/,/image:/s|image:.*|image: ${REMOTE_IMAGE}:${IMAGE_TAG}|" \
+            "${GITOPS_MANIFEST}"
+
+          git add "${GITOPS_MANIFEST}"
+
+          if git diff --cached --quiet; then
+            echo "No GitOps manifest changes detected."
+            exit 0
+          fi
+
+          git commit -m "chore(gitops): update ${GITOPS_CONTAINER} image to ${IMAGE_TAG} [skip ci]"
+          git push origin "HEAD:${GITOPS_BRANCH}"
+
+      # Equivalent to post { always { ... } }
+      - name: Cleanup Local Images
+        if: always()
+        run: |
+          podman image prune -f || true
+          echo "Pipeline execution finished."
+
+      # Equivalent to post { success { ... } }
+      - name: Log Success
+        if: success()
+        run: echo "CI/CD pipeline completed successfully."
+
+      # Equivalent to post { failure { ... } }
+      - name: Log Failure
+        if: failure()
+        run: echo "CI/CD pipeline failed. Check the stage logs."
