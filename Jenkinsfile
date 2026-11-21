@@ -1,30 +1,99 @@
+
 pipeline {
     agent any
+
+    environment {
+        SKIP_CI = 'false'
+    }
+
     stages {
-        stage('Determine Version') {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Check CI Skip') {
             steps {
                 script {
-                    env.APP_VERSION = sh(script: "grep '\"version\"' package.json | cut -d '\"' -f 4 | head -n 1", returnStdout: true).trim()
-                    env.IMAGE_TAG = "${env.APP_VERSION}"
-                    echo "Building and pushing version: ${env.IMAGE_TAG}"
+                    def commitMessage = sh(
+                        script: 'git log -1 --pretty=%B',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Latest commit: ${commitMessage}"
+
+                    if (commitMessage.contains('[skip ci]')) {
+                        env.SKIP_CI = 'true'
+                        echo "CI skipped. This is a GitOps manifest update."
+                    }
                 }
             }
         }
-        stage('Build Docker Image') {
+
+        stage('Determine Version') {
+            when {
+                expression { env.SKIP_CI != 'true' }
+            }
             steps {
-                sh "podman build --network=host --no-cache -t localhost/ansalpandey/kubepractice:${env.IMAGE_TAG} ."
+                script {
+                    env.APP_VERSION = sh(
+                        script: "node -p \"require('./package.json').version\"",
+                        returnStdout: true
+                    ).trim()
+
+                    env.IMAGE_TAG = env.APP_VERSION
+
+                    echo "Building version: ${env.IMAGE_TAG}"
+                }
             }
         }
-        stage('Tag & Push Image to GHCR') {
+
+        stage('Build Docker Image') {
+            when {
+                expression { env.SKIP_CI != 'true' }
+            }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'e6c0b173-c312-4fea-856d-29bbdca656c6', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_PASS')]) {
+                sh """
+                    podman build \
+                    --network=host \
+                    -t localhost/ansalpandey/kubepractice:${IMAGE_TAG} .
+                """
+            }
+        }
+
+        stage('Push Docker Image') {
+            when {
+                expression { env.SKIP_CI != 'true' }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'YOUR_GHCR_CREDENTIAL_ID',
+                        usernameVariable: 'GHCR_USER',
+                        passwordVariable: 'GHCR_PASS'
+                    )
+                ]) {
                     sh '''
-                        echo "$GHCR_PASS" | podman login ghcr.io -u "$GHCR_USER" --password-stdin
+                        echo "$GHCR_PASS" | podman login ghcr.io \
+                            -u "$GHCR_USER" --password-stdin
+
+                        podman tag \
+                            localhost/ansalpandey/kubepractice:${IMAGE_TAG} \
+                            ghcr.io/squareupstudio/kubepractice:${IMAGE_TAG}
+
+                        podman push \
+                            ghcr.io/squareupstudio/kubepractice:${IMAGE_TAG}
                     '''
                 }
-                sh "podman tag localhost/ansalpandey/kubepractice:${env.IMAGE_TAG} ghcr.io/squareupstudio/kubepractice:${env.IMAGE_TAG}"
-                sh "podman push ghcr.io/squareupstudio/kubepractice:${env.IMAGE_TAG}"
             }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline execution completed."
         }
     }
 }
