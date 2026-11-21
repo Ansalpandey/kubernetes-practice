@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -70,7 +69,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'YOUR_GHCR_CREDENTIAL_ID',
+                        credentialsId: 'e6c0b173-c312-4fea-856d-29bbdca656c6',
                         usernameVariable: 'GHCR_USER',
                         passwordVariable: 'GHCR_PASS'
                     )
