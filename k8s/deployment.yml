@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: kubepractice
-        image: ghcr.io/ansalpandey/kubepractice:1.0.1-6b3dc4f
+        image: ghcr.io/ansalpandey/kubepractice:1.0.1-37e58b9
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3200
