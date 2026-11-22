@@ -36,14 +36,13 @@ jobs:
         id: version
         run: |
           APP_VERSION=$(grep '"version"' package.json | cut -d '"' -f 4 | head -n 1)
-          SHORT_SHA=$(git rev-parse --short HEAD)
 
-          if [ -z "$APP_VERSION" ] || [ -z "$SHORT_SHA" ]; then
-            echo "::error::Unable to determine application version or commit SHA."
+          if [ -z "$APP_VERSION" ]; then
+            echo "::error::Unable to determine application version from package.json."
             exit 1
           fi
 
-          IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
+          IMAGE_TAG="${APP_VERSION}"
           echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
           echo "Building and pushing version: ${IMAGE_TAG}"
 
