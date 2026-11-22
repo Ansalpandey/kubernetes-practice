@@ -100,4 +100,4 @@ jobs:
 
       - name: Log Failure
         if: failure()
-        run: echo "CI/CD pipeline failed. Check the stage logs."
+        run: echo "CI/CD pipeline failed. Check the stage logs for more details."
