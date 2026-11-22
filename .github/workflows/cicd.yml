@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-    # Equivalent to your nonK8sChanges guard: skips workflow if ONLY k8s/ files changed
     paths-ignore:
       - 'k8s/**'
 
-# Equivalent to Jenkins options { disableConcurrentBuilds() }
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -24,12 +22,11 @@ env:
 jobs:
   build-and-update-gitops:
     runs-on: ubuntu-latest
-    # Equivalent to your commitMessage.contains('[skip ci]') guard
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
     permissions:
-      contents: write   # Needed to push the GitOps commit back to the repo
-      packages: write   # Needed to push container images to ghcr.io
+      contents: write
+      packages: write
 
     steps:
       - name: Checkout Repository
@@ -54,6 +51,7 @@ jobs:
         run: |
           podman build \
             --network=host \
+            --label "org.opencontainers.image.source=https://github.com/Ansalpandey/kubernetes-practice" \
             -t "${LOCAL_IMAGE}:${IMAGE_TAG}" .
 
       - name: Tag & Push Image to GHCR
@@ -90,19 +88,16 @@ jobs:
           git commit -m "chore(gitops): update ${GITOPS_CONTAINER} image to ${IMAGE_TAG} [skip ci]"
           git push origin "HEAD:${GITOPS_BRANCH}"
 
-      # Equivalent to post { always { ... } }
       - name: Cleanup Local Images
         if: always()
         run: |
           podman image prune -f || true
           echo "Pipeline execution finished."
 
-      # Equivalent to post { success { ... } }
       - name: Log Success
         if: success()
         run: echo "CI/CD pipeline completed successfully."
 
-      # Equivalent to post { failure { ... } }
       - name: Log Failure
         if: failure()
         run: echo "CI/CD pipeline failed. Check the stage logs."
